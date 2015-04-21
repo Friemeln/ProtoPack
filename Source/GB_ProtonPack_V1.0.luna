@@ -23,14 +23,14 @@ avr.stack = 64
 
 #define SPEEDBLUE as  50	' wie schnell ist die blaue Anzeige
 #define SPEEDRED  as 250	' wie schnell ist die rote Anzeige
-							' 4 LEDs in einers Sekunde -> 250ms / LED
+				' 4 LEDs in einers Sekunde -> 250ms / LED
 
 #define MAXLED as 12 		' Anzahl der blauen LEDs
 
-dim blueLED as word			' Varibale die den Zusatnd welche LEDs leuchten speichert
-dim redLED  as byte			' Varibale die den Zusatnd welche LEDs leuchten speichert
+dim blueLED as word		' Varibale die den Zustand welche LEDs leuchten speichert
+dim redLED  as byte		' Varibale die den Zustand welche LEDs leuchten speichert
 
-dim i,j as word 			' Laufvariablen
+dim i,j as word 		' Laufvariablen
 
 // ----------------------------------------------------------------------------
 // Welcher PIN ist für welche LED
@@ -48,7 +48,7 @@ dim i,j as word 			' Laufvariablen
 #define LED6 as portc.2		'
 #define LED7 as portc.3		'
 #define LED8 as portb.1		'
-'								  falls es mehr als 8 blaue LEDs werden
+'				  falls es mehr als 8 blaue LEDs werden
 #if MAXLED > 8
   #define LED9  as portb.0	'
 #endif
@@ -132,7 +132,7 @@ TaskTimer.SaveMode = selfused
 //  zB: 1.3 = 0x13
 //  2x blinken lassen
 //
-setzeBlaueLED(0x10)			' V0.9
+setzeBlaueLED(0x10)			' V1.0
 waitms 200
 setzeBlaueLED(0x00)
 waitms 100
