@@ -298,10 +298,6 @@ endProc
 
 procedure setzeRoteLED(wert as byte)
   
-  'dim i as byte
-  
-  'i= wert
-  
   LEDr1=wert.0
   LEDr2=wert.1
   LEDr3=wert.2
