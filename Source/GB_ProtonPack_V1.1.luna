@@ -1,0 +1,307 @@
+'***************************************************************************
+' Title       : Ladeanzeige eines GhostBuster Protonen-Packs
+'				mit Arduino pro mini Clone: Deek_Robot
+' Last updated: 10.04.2015
+' von         : Joh.Lummel
+' Compiler    : entwickelt mit LunaAVR 2014.r2.4
+'***************************************************************************
+
+#library "Library/TaskMgr.Interface"
+#library "Library/TaskTimer.Interface"
+
+// -------------------------------------------------------------------------
+// System Settings
+const F_CPU = 16000000
+avr.device = atmega328p
+avr.clock = F_CPU
+avr.stack = 64
+
+
+
+// ----------------------------------------------------------------------------
+//  Falls eine Ausgabe über die Serielle Schnittstelle notwemdig wäre...
+//
+' uart.baud = 19200
+' uart.recv.Enable
+' uart.send.enable
+
+// ----------------------------------------------------------------------------
+//  Variable & Konstanten
+//
+#define SPEEDBLUE as  50	' wie schnell ist die blaue Anzeige
+#define SPEEDRED  as 250	' wie schnell ist die rote Anzeige
+' 4 LEDs in einers Sekunde -> 250ms / LED
+
+#define MAXLED as 12 		' Anzahl der blauen LEDs
+
+dim blueLED as word			' Variable die den Zustand welche LEDs leuchten speichert
+dim redLED  as byte			' Variable die den Zustand welche LEDs leuchten speichert
+
+dim i,j as word 			' Laufvariablen
+
+// ----------------------------------------------------------------------------
+// Welcher PIN ist für welche LED
+//
+// hier die blauen LEDs
+//
+#define LED1 as portb.2		'
+#define LED2 as portb.3		' MOSI
+#define LED3 as portb.4		' MISO
+
+#define Takt as portb.5		' SCk, die grüne LED auf dem Board, reiner Augenschmaus. Damit was blinkt im Takt der Schleifen
+
+#define LED4 as portc.0		'
+#define LED5 as portc.1		'
+#define LED6 as portc.2		'
+#define LED7 as portc.3		'
+#define LED8 as portb.1		'
+'								  falls es mehr als 8 blaue LEDs werden
+#if MAXLED > 8
+  #define LED9  as portb.0	'
+#endif
+#if MAXLED > 9
+  #define LED10 as portd.7	'
+#endif
+#if MAXLED > 10
+  #define LED11 as portd.6	'
+#endif
+#if MAXLED > 11
+  #define LED12 as portd.5	'
+#endif
+
+//
+// und hier die roten LEDs
+//
+#define LEDr1 as portd.4	'
+#define LEDr2 as portd.3	'
+#define LEDr3 as portd.2	'
+#define LEDr4 as portd.0	'
+
+// ----------------------------------------------------------------------------
+// Die entsprechenden Ports initialisieren: als Ausgang und LOW
+
+LED1.mode	= output,low
+LED2.mode	= output,low
+LED3.mode	= output,low
+LED4.mode	= output,low
+LED5.mode	= output,low
+LED6.mode	= output,low
+LED7.mode	= output,low
+LED8.mode	= output,low
+#if MAXLED > 8
+  LED9.mode	= output,low
+#endif
+#if MAXLED > 9
+  LED10.mode	= output,low
+#endif
+#if MAXLED > 10
+  LED11.mode	= output,low
+#endif
+#if MAXLED > 11
+  LED12.mode	= output,low
+#endif
+
+LEDr1.mode	= output,low
+LEDr2.mode	= output,low
+LEDr3.mode	= output,low
+LEDr4.mode	= output,low
+
+Takt.mode	= output,low
+
+
+// ----------------------------------------------------------------------------
+// Taskmanager initialisieren
+//
+#define NUM_TASKS as 2
+' #define FLASH_TIME1 as SPEEDBLUE
+' #define FLASH_TIME2 as SPEEDRED
+
+taskmgr.init( NUM_TASKS )
+
+// ----------------------------------------------------------------------------
+// Tasks einplanen
+//
+TaskMgr.TaskAdd( task_blue_toggle().Addr, SPEEDBLUE )
+TaskMgr.TaskAdd( task_red_toggle().Addr, SPEEDRED )
+
+// ----------------------------------------------------------------------------
+// The TaskTimer-ISR have to save only the own changed registers.
+// This because we use a method from a library that save his own registers too.
+// This saves stack memory.
+//
+#define TIMED_TASKS as 1
+#define TIMED_TIMESLICE as 1 'ms
+TaskTimer.SaveMode = selfused
+
+
+// ----------------------------------------------------------------------------
+//  Softwareversion kurz anzeigen
+//  zB: 1.3 = 0x13
+//  2x blinken lassen
+//
+setzeBlaueLED(0x0101)			' V1.1
+waitms 1000
+//
+//  und noch Geschwindigkeit von Blau (SPEEDBLUE)
+//
+setzeBlaueLED(SPEEDBLUE)
+waitms 1000
+//
+//  und dito von Rot (SPEEDRED)
+//
+setzeBlaueLED(SPEEDRED)
+waitms 1000
+setzeBlaueLED(0x00)
+waitms 100
+
+
+' 1x Cylonenaugen um alle LED zu testen
+blueLED = 1
+for j=0 to MAXLED-2
+  
+  setzeBlaueLED(blueLED)
+  waitms 30
+  
+  blueLED <<= 1
+  
+  Takt.Toggle 		// nur EyeCandy
+  
+next
+
+for j=0 to MAXLED-1
+  
+  setzeBlaueLED(blueLED)
+  waitms 30
+  
+  blueLED >>= 1
+  
+  Takt.Toggle 		// nur EyeCandy
+  
+next
+
+j=(2^MAXLED)-1			' Vergleichswert für: alle Bits auf 1, d.h. alle blauen LEDs leuchten
+blueLED=0
+redLED=1
+
+// ----------------------------------------------------------------------------
+// initialize TaskTimer with 1 Task and a interval of 1 ms.
+//
+TaskTimer.Init(Timer0, TIMED_TASKS, TIMED_TIMESLICE)
+
+// ----------------------------------------------------------------------------
+// Set the poll-method of the TaskMgr as a TaskTimer-Task.
+//
+TaskTimer.Task(0)=taskmgr.Poll().Addr
+
+// ----------------------------------------------------------------------------
+// Enable all Interrupt
+//
+Avr.Interrupts.Enable
+
+
+// ----------------------------------------------------------------------------
+// >>>>>>>>>>>>>>>>>>>     Main - Loop     <<<<<<<<<<<<<<<<<<<
+// ----------------------------------------------------------------------------
+//
+do
+  
+  if TaskMgr.Tick then '1ms clock from TaskManager (and the TaskManager is polled from the TaskTimer)
+    TaskMgr.Schedule() 'call scheduler, wich calls the planned TaskManager-tasks.
+  endif
+  
+loop
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+halt()				// egal was kommt, hier ist Schluß ;-)
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+// ----------------------------------------------------------------------------
+//  Definition der Einzelnen Tasks
+//
+
+
+// ----------------------------------------------------------------------------
+// die aufsteigende Ladeanzeige der blauen LEDs
+//
+
+procedure task_blue_toggle()
+  
+  ' blueLED und j sind globale Variablen :-/
+  
+  if blueLED = j then
+    blueLED = 0
+  else
+    blueLED <<= 1
+    blueLED or=0B00000001
+  endif
+  
+  setzeBlaueLED(blueLED)
+  
+  Takt.Toggle 		// nur EyeCandy
+  
+  taskmgr.TaskAdd( task_blue_toggle().Addr, SPEEDBLUE )
+endproc
+
+// ----------------------------------------------------------------------------
+// die vier abwechselnd blinkenden roten LEDs
+//
+
+procedure task_red_toggle()
+  
+  ' redLED ist globale Variablen :-/
+  
+  if redLED = 0b0001000 then
+    redLED = 1
+  else
+    redLED <<= 1
+  endif
+  
+  setzeRoteLED(redLED)
+  
+  taskmgr.TaskAdd( task_red_toggle().Addr, SPEEDRED )
+endproc
+
+/////////////////////////////////////////////////////////////////////////////////////
+//
+//			Proceduren...
+//
+/////////////////////////////////////////////////////////////////////////////////////
+
+
+procedure setzeBlaueLED(wert as word)
+  
+  LED1=wert.0
+  LED2=wert.1
+  LED3=wert.2
+  LED4=wert.3
+  LED5=wert.4
+  LED6=wert.5
+  LED7=wert.6
+  LED8=wert.7
+  #if MAXLED > 8
+    LED9=wert.8
+  #endif
+  #if MAXLED > 9
+    LED10=wert.9
+  #endif
+  #if MAXLED > 10
+    LED11=wert.10
+  #endif
+  #if MAXLED > 11
+    LED12=wert.11
+  #endif
+  
+endProc
+
+procedure setzeRoteLED(wert as byte)
+  
+  LEDr1=wert.0
+  LEDr2=wert.1
+  LEDr3=wert.2
+  LEDr4=wert.3
+  
+endProc
